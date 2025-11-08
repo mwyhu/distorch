@@ -63,7 +63,7 @@ def test_is_border_element(image, is_border, device_type: str):
     image = torch.tensor(image, dtype=torch.bool, device=device)
     is_border = torch.tensor(is_border, dtype=torch.bool, device=device)
     distorch_is_border = boundary.is_border_element(image)
-    assert torch.equal(is_border, distorch_is_border), (is_border, distorch_is_border)
+    torch.testing.assert_close(is_border, distorch_is_border)
 
 
 # @formatter:off
@@ -127,4 +127,4 @@ def test_is_surface_vertex(image, is_surface, device_type: str):
     image = torch.tensor(image, dtype=torch.bool, device=device)
     is_surface = torch.tensor(is_surface, dtype=torch.bool, device=device)
     distorch_is_surface = boundary.is_surface_vertex(image)
-    assert torch.equal(is_surface, distorch_is_surface), (is_surface, distorch_is_surface)
+    torch.testing.assert_close(is_surface, distorch_is_surface)
