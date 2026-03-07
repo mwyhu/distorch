@@ -15,4 +15,4 @@ def test_zero_padded_nonnegative_quantile(n: int, sparsity: float, q: float):
 
     quantile_padded = torch.quantile(x_padded, q=q)
     quantile_adjusted = zero_padded_nonnegative_quantile(x, q=q, n=n)
-    assert torch.allclose(quantile_padded, quantile_adjusted, atol=1e-5, rtol=0)
+    torch.testing.assert_close(quantile_padded, quantile_adjusted)

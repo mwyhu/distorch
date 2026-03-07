@@ -60,7 +60,7 @@ def test_euclidean_distance_transform(image, sqdistances, device_type: str = 'cu
     image = torch.tensor(image, dtype=torch.bool, device=device)
     distances = torch.tensor(sqdistances, dtype=torch.float, device=device).sqrt()
     edt = distance_transform.euclidean_distance_transform(image)
-    assert torch.allclose(distances, edt), torch.stack((distances, edt, distances - edt), dim=0)
+    torch.testing.assert_close(distances, edt)
 
 
 # @formatter:off
@@ -127,4 +127,4 @@ def test_surface_euclidean_distance_transform(image, sqdistances, device_type: s
     image = torch.tensor(image, dtype=torch.bool, device=device)
     distances = torch.tensor(sqdistances, dtype=torch.float, device=device).sqrt()
     edt = distance_transform.surface_euclidean_distance_transform(image)
-    assert torch.allclose(distances, edt), torch.stack((distances, edt, distances - edt), dim=0)
+    torch.testing.assert_close(distances, edt)
