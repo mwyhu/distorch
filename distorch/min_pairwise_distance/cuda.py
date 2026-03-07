@@ -4,77 +4,57 @@ from torch import Tensor
 
 
 @triton.jit
-def _minimum_sqdistances_2d(x1_ptr,
-                            x2_ptr,
-                            min_dist_ptr,
-                            m,
-                            BLOCK_SIZE: tl.constexpr):
+def _minimum_sqdistances(x1_ptr,
+                         x2_ptr,
+                         min_dist_ptr,
+                         m,
+                         d: tl.constexpr,
+                         BLOCK_SIZE: tl.constexpr):
     row_idx = tl.program_id(0)
     col_idx = tl.program_id(1)
     num_cols = tl.num_programs(1)
 
-    x1_row_start = x1_ptr + row_idx * 2
+    x1_row_start = x1_ptr + row_idx * d
     x1_x = tl.load(x1_row_start)
     x1_y = tl.load(x1_row_start + 1)
+    if d == 3:
+        x1_z = tl.load(x1_row_start + 2)
 
-    targets_offset = tl.arange(0, BLOCK_SIZE) * 2
+    targets_offset = tl.arange(0, BLOCK_SIZE) * d
     col = col_idx * BLOCK_SIZE
 
-    mask = col * 2 + targets_offset < m * 2
-    x2_x = tl.load(x2_ptr + col * 2 + targets_offset, mask=mask, other=float('inf'))
-    x2_y = tl.load(x2_ptr + col * 2 + targets_offset + 1, mask=mask, other=float('inf'))
+    mask = col * d + targets_offset < m * d
+    x2_x = tl.load(x2_ptr + col * d + targets_offset, mask=mask, other=float('inf'))
+    x2_y = tl.load(x2_ptr + col * d + targets_offset + 1, mask=mask, other=float('inf'))
+    if d == 3:
+        x2_z = tl.load(x2_ptr + col * d + targets_offset + 2, mask=mask, other=float('inf'))
+
     dx = x1_x - x2_x
     dy = x1_y - x2_y
     sqdist = dx * dx + dy * dy
-    min_sqdist = tl.min(sqdist, axis=0)
+    if d == 3:
+        dz = x1_z - x2_z
+        sqdist = sqdist + dz * dz
 
-    result_ptr = min_dist_ptr + row_idx * num_cols + col_idx
-    tl.store(result_ptr, min_sqdist)
-
-
-@triton.jit
-def _minimum_sqdistances_3d(x1_ptr,
-                            x2_ptr,
-                            min_dist_ptr,
-                            m,
-                            BLOCK_SIZE: tl.constexpr):
-    row_idx = tl.program_id(0)
-    col_idx = tl.program_id(1)
-    num_cols = tl.num_programs(1)
-
-    x1_row_start = x1_ptr + row_idx * 3
-    x1_x = tl.load(x1_row_start)
-    x1_y = tl.load(x1_row_start + 1)
-    x1_z = tl.load(x1_row_start + 2)
-
-    targets_offset = tl.arange(0, BLOCK_SIZE) * 3
-    col = col_idx * BLOCK_SIZE
-
-    mask = col * 3 + targets_offset < m * 3
-    x2_x = tl.load(x2_ptr + col * 3 + targets_offset, mask=mask, other=float('inf'))
-    x2_y = tl.load(x2_ptr + col * 3 + targets_offset + 1, mask=mask, other=float('inf'))
-    x2_z = tl.load(x2_ptr + col * 3 + targets_offset + 2, mask=mask, other=float('inf'))
-    dx = x1_x - x2_x
-    dy = x1_y - x2_y
-    dz = x1_z - x2_z
-    sqdist = dx * dx + dy * dy + dz * dz
-    min_sqdist = tl.min(sqdist, axis=0)
-
-    result_ptr = min_dist_ptr + row_idx * num_cols + col_idx
-    tl.store(result_ptr, min_sqdist)
+    tl.store(min_dist_ptr + row_idx * num_cols + col_idx, tl.min(sqdist, axis=0))
 
 
 def min_sqdist(x1: Tensor, x2: Tensor, BLOCK_SIZE: int = 2048) -> Tensor:
+    if not x1.is_cuda or x1.device != x2.device:
+        raise ValueError('x1 and x2 must be on the same CUDA device.')
     d = x1.size(1)
-    assert d == x2.size(1)
+    if d != x2.size(1):
+        raise ValueError(f'{x1.size(1)} and {x2.size(1)} must be equal.')
+    if not 2 <= d <= 3:
+        raise ValueError('d must be between 2 and 3.')
+
     n, m = x1.size(0), x2.size(0)
     BLOCK_SIZE = min(BLOCK_SIZE, triton.next_power_of_2(m))
     grid_cols = triton.cdiv(m, BLOCK_SIZE)
-    min_distances = x1.new_empty(size=(n, grid_cols))
-    if d == 2:
-        _minimum_sqdistances_2d[(n, grid_cols)](x1, x2, min_distances, m, BLOCK_SIZE=BLOCK_SIZE)
-    if d == 3:
-        _minimum_sqdistances_3d[(n, grid_cols)](x1, x2, min_distances, m, BLOCK_SIZE=BLOCK_SIZE)
+    min_distances = x1.new_empty(size=(n, grid_cols))  # allocate result tensor
+
+    _minimum_sqdistances[(n, grid_cols)](x1, x2, min_distances, m,
+                                         d=d, BLOCK_SIZE=BLOCK_SIZE)
     return min_distances.amin(dim=1)
 
 
