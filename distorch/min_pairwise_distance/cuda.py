@@ -41,12 +41,12 @@ def _minimum_sqdistances(x1_ptr,
 
 def min_sqdist(x1: Tensor, x2: Tensor, BLOCK_SIZE: int = 2048) -> Tensor:
     if not x1.is_cuda or x1.device != x2.device:
-        raise ValueError('x1 and x2 must be on the same CUDA device.')
+        raise ValueError(f'{x1.device=} and {x2.device=} must be the same CUDA device.')
     d = x1.size(1)
     if d != x2.size(1):
-        raise ValueError(f'{x1.size(1)} and {x2.size(1)} must be equal.')
+        raise ValueError(f'{x1.size(1)=} and {x2.size(1)=} must be equal.')
     if not 2 <= d <= 3:
-        raise ValueError('d must be between 2 and 3.')
+        raise ValueError(f'{d=} must be between 2 and 3.')
 
     n, m = x1.size(0), x2.size(0)
     BLOCK_SIZE = min(BLOCK_SIZE, triton.next_power_of_2(m))
