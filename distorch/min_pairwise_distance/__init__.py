@@ -13,14 +13,17 @@ if use_triton:
     from .cuda import min_sqdist
 
 
-def minimum_distances(elem1: Tensor, elem2: Tensor) -> Tensor:
+def minimum_distances(elem1: Tensor, elem2: Tensor, sqrt: bool = True) -> Tensor:
     if elem1.size(0) == 0:
         min_dists = elem1.new_zeros(size=(1,))
     elif use_pykeops and elem1.is_cuda:
-        min_dists = Vi(elem1).sqdist(Vj(elem2)).min(dim=1).squeeze(1).sqrt_()
+        min_dists = Vi(elem1).sqdist(Vj(elem2)).min(dim=1).squeeze(1)
+        if sqrt: min_dists.sqrt_()
     elif use_triton and elem1.is_cuda:
-        min_dists = min_sqdist(elem1, elem2).sqrt_()
+        min_dists = min_sqdist(elem1, elem2)
+        if sqrt: min_dists.sqrt_()
     else:  # defaults to native
         min_dists = torch.cdist(elem1, elem2).amin(dim=1)
+        if not sqrt: min_dists.square_()
 
     return min_dists
