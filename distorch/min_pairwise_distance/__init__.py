@@ -1,4 +1,5 @@
 import importlib.util
+import os
 
 import torch
 from torch import Tensor
@@ -12,14 +13,19 @@ if use_pykeops:
 if use_triton:
     from .cuda import min_sqdist
 
+triton_interpret = os.environ.get('TRITON_INTERPRET', '0') == '1'
+
 
 def minimum_distances(elem1: Tensor, elem2: Tensor, sqrt: bool = True) -> Tensor:
+    if elem1.device != elem2.device:
+        raise ValueError(f'{elem1.device=} and {elem2.device=} must be the same device.')
+
     if elem1.size(0) == 0:
         min_dists = elem1.new_zeros(size=(1,))
     elif use_pykeops and elem1.is_cuda:
         min_dists = Vi(elem1).sqdist(Vj(elem2)).min(dim=1).squeeze(1)
         if sqrt: min_dists.sqrt_()
-    elif use_triton and elem1.is_cuda:
+    elif use_triton and (elem1.is_cuda or triton_interpret):
         min_dists = min_sqdist(elem1, elem2)
         if sqrt: min_dists.sqrt_()
     else:  # defaults to native

@@ -3,8 +3,12 @@ import torch
 
 from distorch.min_pairwise_distance import minimum_distances
 
+devices = ["cpu"]
+if torch.cuda.is_available():
+    devices.append("cuda")
 
-@pytest.mark.parametrize("device_type", ("cpu", "cuda"))
+
+@pytest.mark.parametrize("device_type", devices)
 @pytest.mark.parametrize("d", (2, 3))
 @pytest.mark.parametrize("dtype", (torch.float, torch.double))
 @pytest.mark.parametrize("n,m", ((3, 5), (64, 64), (64, 128), (128, 64)))

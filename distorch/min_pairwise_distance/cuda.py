@@ -40,8 +40,6 @@ def _minimum_sqdistances(x1_ptr,
 
 
 def min_sqdist(x1: Tensor, x2: Tensor, BLOCK_SIZE: int = 2048) -> Tensor:
-    if not x1.is_cuda or x1.device != x2.device:
-        raise ValueError(f'{x1.device=} and {x2.device=} must be the same CUDA device.')
     d = x1.size(1)
     if d != x2.size(1):
         raise ValueError(f'{x1.size(1)=} and {x2.size(1)=} must be equal.')
